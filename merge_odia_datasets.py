@@ -3,21 +3,22 @@
 Merge all Odia OCR datasets and prepare for HuggingFace Hub upload
 """
 
-from datasets import load_dataset, concatenate_datasets, Dataset
+from datasets import load_dataset, concatenate_datasets
 import json
 from pathlib import Path
 import os
 
 def merge_all_odia_datasets(output_dir="./merged_odia_ocr_dataset", save_locally=True):
     """
-    Merge all available Odia OCR datasets
+    Merge all available Odia OCR datasets into a single dataset
+    with comprehensive README for training.
     
     Args:
-        output_dir: Directory to save merged dataset
-        save_locally: Whether to save locally first
+        output_dir: Directory to save merged dataset (default: ./merged_odia_ocr_dataset)
+        save_locally: Whether to save to disk (default: True)
     
     Returns:
-        Merged dataset and statistics
+        tuple: (merged_dataset, dataset_stats)
     """
     
     print("\n" + "="*80)

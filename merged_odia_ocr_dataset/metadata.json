@@ -1,0 +1,40 @@
+{
+  "name": "Odia OCR - Merged Multi-Source Dataset",
+  "description": "Combined Odia OCR dataset from multiple sources",
+  "total_samples": 145781,
+  "sources": {
+    "OdiaGenAIOCR/Odia-lipi-ocr-data": {
+      "samples": 64,
+      "source": "HuggingFace Hub",
+      "type": "Word-level OCR",
+      "features": [
+        "text",
+        "image"
+      ]
+    },
+    "tell2jyoti/odia-handwritten-ocr": {
+      "samples": 145717,
+      "source": "HuggingFace Hub",
+      "type": "Character-level (32x32px)",
+      "features": [
+        "image_path",
+        "filename",
+        "class_id",
+        "character",
+        "type",
+        "augmentation"
+      ]
+    }
+  },
+  "features": [
+    "text",
+    "image",
+    "image_path",
+    "filename",
+    "class_id",
+    "character",
+    "type",
+    "augmentation"
+  ],
+  "creation_date": "2026-02-22"
+}
