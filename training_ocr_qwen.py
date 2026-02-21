@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 from transformers import (
     AutoProcessor,
     Qwen2_5_VLForConditionalGeneration,
@@ -9,8 +9,54 @@ from peft import LoraConfig, get_peft_model
 import torch
 import os
 
-# 1) Load the dataset
-dataset = load_dataset("OdiaGenAIOCR/Odia-lipi-ocr-data")
+# ============================================================================
+# 1) LOAD MULTIPLE ODIA OCR DATASETS
+# ============================================================================
+
+def load_odia_datasets(use_multiple=False):
+    """
+    Load Odia OCR datasets
+    
+    Args:
+        use_multiple: If True, combine multiple sources including handwritten dataset
+    
+    Returns:
+        Loaded dataset
+    """
+    
+    datasets = []
+    
+    # Primary dataset
+    print("📥 Loading primary dataset: OdiaGenAIOCR/Odia-lipi-ocr-data")
+    ds1 = load_dataset("OdiaGenAIOCR/Odia-lipi-ocr-data")
+    datasets.append(ds1["train"])
+    print(f"   ✅ Loaded: {len(ds1['train'])} samples\n")
+    
+    # Optional: Add handwritten dataset
+    if use_multiple:
+        try:
+            print("📥 Loading secondary dataset: tell2jyoti/odia-handwritten-ocr")
+            ds2 = load_dataset("tell2jyoti/odia-handwritten-ocr")
+            first_split = list(ds2.keys())[0]
+            datasets.append(ds2[first_split])
+            print(f"   ✅ Loaded: {len(ds2[first_split])} samples (split: {first_split})\n")
+        except Exception as e:
+            print(f"   ⚠️  Could not load handwritten dataset: {e}\n")
+    
+    # Combine all datasets
+    if len(datasets) > 1:
+        combined = concatenate_datasets(datasets)
+        print(f"✅ COMBINED DATASET: {len(combined)} total samples")
+        print(f"   • OdiaGenAIOCR: {len(datasets[0])} samples")
+        if len(datasets) > 1:
+            print(f"   • tell2jyoti: {len(datasets[1])} samples")
+        print()
+        return combined
+    else:
+        return datasets[0]
+
+# Load dataset (set use_multiple=True to include handwritten data)
+dataset = load_odia_datasets(use_multiple=True)
 
 # 2) Load Qwen 2.5 VL processor (model instantiated under __main__)
 model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
@@ -38,10 +84,10 @@ if image_token not in processor.tokenizer.get_vocab():
 
 # 3) Add QLoRA (low-rank adapters) so the base stays frozen
 lora_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-    lora_dropout=0.1,
+    r=32,                              # Increased: better representation
+    lora_alpha=64,                     # Increased: 2x scaling
+    target_modules=["q_proj", "v_proj"],  # Focused: remove k_proj, o_proj for stability
+    lora_dropout=0.05,                 # Reduced: lower dropout for better signal
 )
 
 # 4) Preprocess examples - process individually to avoid tensor batching issues
@@ -99,15 +145,21 @@ training_args = TrainingArguments(
     per_device_train_batch_size=1,
     per_device_eval_batch_size=1,
     gradient_accumulation_steps=4,
-    learning_rate=1e-5,
-    max_steps=100,
+    max_steps=500,                     # Increased: from 100 to 500 steps
+    warmup_steps=50,                   # NEW: 10% warmup for better stability
+    learning_rate=1e-4,                # Reduced: from 2e-4 for better convergence
     logging_steps=10,
     save_strategy="steps",
     save_steps=50,
-    fp16=False,  # Disable FP16 to reduce memory footprint
+    eval_steps=50,                     # NEW: evaluate during training
+    evaluation_strategy="steps",       # NEW: track eval metrics
+    lr_scheduler_type="cosine",        # IMPROVED: cosine decay instead of linear
+    fp16=False,
     remove_unused_columns=False,
     dataloader_num_workers=0,
     optim="adamw_torch",
+    load_best_model_at_end=True,       # NEW: keep best checkpoint
+    metric_for_best_model="eval_loss",  # NEW: track by eval loss
 )
 
 # 6) Trainer

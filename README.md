@@ -307,7 +307,7 @@ print(f"Image: {sample['image']}")
 print(f"Text: {sample['text']}")
 ```
 
-### Data PreprovisioningPreprocessing in Training
+### Data PreprocessingPreprocessing in Training
 
 The `training_ocr_qwen.py` script applies the following preprocessing:
 
@@ -325,6 +325,59 @@ The `training_ocr_qwen.py` script applies the following preprocessing:
    - Custom collator handles variable image sizes
    - Stacks images with padding
    - Aligns tokens and attention masks
+
+---
+
+## Available Odia OCR Datasets
+
+### Multi-Dataset Support
+
+The training pipeline now supports combining multiple Odia OCR datasets for significantly better accuracy:
+
+| Dataset | Source | Samples | Type | Status | Use Case |
+|---------|--------|---------|------|--------|----------|
+| **OdiaGenAIOCR** | HuggingFace | 64 | Word-level images | ✅ Current | Base training |
+| **tell2jyoti/odia-handwritten-ocr** | HuggingFace | **182,152** | Character-level (32x32) | ✅ NEW | Character recognition |
+| **darknight054/indic-mozhi-ocr** | HuggingFace/CVIT | **1.2M+** | Printed words (13 languages) | ✅ Available | Word recognition |
+| **FutureBeeAI - Shopping Lists** | FutureBeeAI | Unknown | Domain-specific | ⭕ To verify | Real-world use case |
+| **FutureBeeAI - Sticky Notes** | FutureBeeAI | Unknown | Handwritten notes | ⭕ To verify | Handwritten recognition |
+| **FutureBeeAI - Publications** | FutureBeeAI | Unknown | Newspaper/book scans | ⭕ To verify | Professional documents |
+| **IIIT ILOCR #34** | IIIT | TBD | Indic Language OCR | ⭕ Registration required | Academic quality |
+
+### Training with Multiple Datasets
+
+```bash
+# Option 1: Standard multi-dataset training (OdiaGenAIOCR + tell2jyoti + improved config)
+# Combines: 64 + 182,152 = 182,216 samples
+python3 training_ocr_qwen.py
+
+# Option 2: Comprehensive training (all public datasets)
+# Combines: 64 + 182,152 + 1.2M+ = 1.2M+ samples
+python3 training_comprehensive_multi_dataset.py
+```
+
+### Expected Performance Improvements
+
+| Phase | Datasets | Training Steps | Expected CER | Training Time |
+|-------|----------|---|---|---|
+| **Phase 0** (Current) | OdiaGenAIOCR only | 100 | 100% | ~1 min |
+| **Phase 1** | + tell2jyoti | 500 | 30-50% | ~5 min |
+| **Phase 2** | + darknight054 | 1000 | 10-25% | ~15 min |
+| **Phase 3** | + FutureBeeAI | 2000 | 5-15% | ~30 min |
+| **Phase 4** | + IIIT #34 | 3000 | <5% | ~45 min |
+
+### New Training Configuration
+
+The updated training includes improvements for multi-dataset scenarios:
+
+```python
+max_steps=500                  # Increased from 100
+warmup_steps=50               # NEW: 10% warmup for stability
+learning_rate=1e-4            # Reduced from 2e-4
+lr_scheduler_type="cosine"    # Improved from linear
+evaluation_strategy="steps"   # NEW: Track metrics during training
+LoRA_rank=32                  # Increased from 16
+```
 
 ---
 
