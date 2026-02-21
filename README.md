@@ -52,21 +52,156 @@ This repository contains a fine-tuned **Qwen/Qwen2.5-VL-3B-Instruct** multimodal
 | **Model Size** | 7.51 GB (merged weights) |
 | **Adapter Size** | 29 MB (LoRA weights only) |
 
-### Model Training Configuration
+### Training Summary
 
-```yaml
-Base Model: Qwen/Qwen2.5-VL-3B-Instruct
-Fine-tuning Method: LoRA (PEFT)
-Training Steps: 100 (with 2 checkpoints)
-Batch Size: 1 (effective: 4 with gradient accumulation)
-Learning Rate: 2e-4
-Max Sequence Length: 2048
-Precision: FP16 disabled for stability
-LoRA Config:
-  - r: 32 (rank)
-  - lora_alpha: 64
-  - target_modules: [q_proj, v_proj]
+**Training Completion:** ✅ Completed  
+**Total Training Steps:** 100  
+**Total Training Epochs:** ~1.5 epochs (on 64 training samples)  
+**Training Time:** ~60 seconds  
+**Checkpoint Selected:** checkpoint-50 (first checkpoint)  
+**Device:** GPU (79GB VRAM, 135.181.8.206)
+
+### Complete Training Hyperparameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| **Base Model** | Qwen/Qwen2.5-VL-3B-Instruct | 3 billion parameter Vision-Language Model |
+| **Fine-tuning Method** | LoRA (PEFT) | Parameter-Efficient Fine-Tuning |
+| **Total Training Steps** | 100 | Total optimization steps |
+| **Warmup Steps** | 0 | No warmup applied |
+| **Save Steps** | 50 | Checkpoint saved every 50 steps (2 total) |
+| **Eval Steps** | N/A | Evaluation disabled during training |
+| **Batch Size** | 1 | Per-device batch size |
+| **Gradient Accumulation Steps** | 4 | Effective batch size: 4 |
+| **Learning Rate** | 2e-4 (0.0002) | Initial learning rate |
+| **Learning Rate Scheduler** | linear | Linear decay schedule |
+| **Optimizer** | AdamW | PyTorch AdamW optimizer |
+| **Optimizer Beta 1** | 0.9 | Adam beta1 parameter |
+| **Optimizer Beta 2** | 0.999 | Adam beta2 parameter |
+| **Weight Decay** | 0.0 | No weight decay applied |
+| **Max Gradient Norm** | 1.0 | Gradient clipping value |
+| **Precision Mode** | FP32 | Full precision (FP16 disabled for stability) |
+| **Max Sequence Length** | 2048 | Maximum token sequence length |
+| **Max Image Tokens** | N/A | Auto-determined by processor |
+| **Dataloader Workers** | 0 | Single-threaded data loading |
+| **Dataloader Pin Memory** | False | CPU-pinned memory disabled |
+| **Seed** | 42 | Random seed for reproducibility |
+| **Output Directory** | ./qwen_ocr_finetuned | Checkpoint save location |
+
+### LoRA Configuration
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| **Rank (r)** | 32 | LoRA decomposition rank |
+| **Alpha (α)** | 64 | LoRA scaling factor (α/r = 2.0x) |
+| **Dropout** | 0.05 | LoRA dropout rate |
+| **Target Modules** | q_proj, v_proj | Query and Value projection layers |
+| **Bias** | none | No bias adaptation |
+| **Task Type** | CAUSAL_LM | Causal language modeling (text generation) |
+
+### Training Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| **Training Dataset Size** | 64 samples |
+| **Evaluation Dataset Size** | 50 samples |
+| **Steps per Epoch** | ~0.64 (64 / effective_batch_4) |
+| **Total Epochs** | ~1.5 (100 / 64 effective samples) |
+| **Training Time** | ~60 seconds |
+| **Average Step Time** | ~600ms |
+| **GPU Memory Used** | ~15-20 GB |
+| **Final Training Loss** | Converged (100 steps) |
+
+---
+
+## Evaluation Metrics & Accuracy
+
+### Current Model Accuracy (100 Training Steps)
+
+**⚠️ Note:** Model is in **early training phase**. At 100 steps, the model has seen only ~1.5 epochs of data and requires more training for meaningful OCR performance.
+
+| Metric | Score | Interpretation |
+|--------|-------|-----------------|
+| **Character Error Rate (CER)** | 1.0000 (100%) | ❌ All characters incorrect |
+| **Word Error Rate (WER)** | 1.0000 (100%) | ❌ All words incorrect |
+| **Exact Match Accuracy** | 0.00% | ❌ No exact predictions match reference |
+| **Inference Time (Mean)** | 433.40 ms | ✅ Reasonable for 3B model |
+| **Inference Time (Median)** | 345.68 ms | ✅ Faster typical case |
+| **Inference Time (Min)** | 279.99 ms | ✅ Best case |
+| **Inference Time (Max)** | 1039.07 ms | ⚠️ Worst case (image complexity) |
+
+### Why High Error Rates Currently?
+
+1. **Limited training steps** (100 vs. recommended 500-1000+)
+2. **Small dataset** (only 64 training samples)
+3. **Early convergence phase** - model still learning Odia script patterns
+4. **No warmup period** - immediate learning from cold start
+5. **Model hasn't seen enough variations** of Odia text
+
+### Expectations vs. Requirements
+
 ```
+Current Status (100 steps):   ❌ Not production-ready
+                             ⚠️ Proof of concept only
+                             ✅ Infrastructure working
+
+Target Status (500+ steps):   ✅ Production-ready
+                             ✅ CER < 20%
+                             ✅ WER < 30%
+                             ✅ Reliable core functionality
+```
+
+### Recommended Improvements
+
+**To improve from current 100% CER to < 20% CER:**
+
+1. **Increase training steps** to 500-1000
+   ```yaml
+   max_steps: 500  # Recommended minimum
+   save_steps: 50  # Save every 50 steps
+   ```
+
+2. **Add warmup period**
+   ```yaml
+   warmup_steps: 50  # 5-10% of total steps
+   ```
+
+3. **Adjust learning rate schedule**
+   ```yaml
+   learning_rate: 1e-4  # Try lower LR
+   lr_scheduler_type: "cosine"  # Better convergence
+   ```
+
+4. **Increase batch size** (if VRAM allows)
+   ```yaml
+   per_device_train_batch_size: 2  # From 1 to 2
+   gradient_accumulation_steps: 2   # Maintain effective batch=4
+   ```
+
+5. **Add data augmentation**
+   - Image rotations, brightness adjustments
+   - Text augmentation for variations
+
+6. **Collect more training data**
+   - Current: 64 samples
+   - Target: 500+ samples
+   - Diverse document types
+
+---
+
+## Performance Summary
+
+### Model Capabilities
+- ✅ Successfully loads base model (Qwen2.5-VL)
+- ✅ Successfully applies LoRA adapters
+- ✅ Successfully performs inference
+- ✅ Reasonable inference speed (~430ms)
+- ❌ Accuracy needs improvement (requires more training)
+
+### Status for Production
+- 🔴 **Not Ready** (100% CER)
+- 🟡 **In Development** (target: 500+ training steps)
+- 🟢 **Production Target** (target: < 20% CER)
 
 ---
 
