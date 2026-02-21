@@ -96,16 +96,18 @@ data_collator = QwenOCRDataCollator(processor)
 # 5) Training arguments
 training_args = TrainingArguments(
     output_dir="./qwen_ocr_finetuned",
-    per_device_train_batch_size=2,
-    per_device_eval_batch_size=2,
-    gradient_accumulation_steps=8,
+    per_device_train_batch_size=1,
+    per_device_eval_batch_size=1,
+    gradient_accumulation_steps=4,
     learning_rate=1e-5,
-    max_steps=1500,
-    logging_steps=50,
+    max_steps=100,
+    logging_steps=10,
     save_strategy="steps",
-    save_steps=500,
-    fp16=True,
+    save_steps=50,
+    fp16=False,  # Disable FP16 to reduce memory footprint
     remove_unused_columns=False,
+    dataloader_num_workers=0,
+    optim="adamw_torch",
 )
 
 # 6) Trainer
