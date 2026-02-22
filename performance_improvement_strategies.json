@@ -1,0 +1,88 @@
+{
+  "Phase 2A: Inference Optimization": {
+    "description": "Optimize checkpoint-250 for better predictions",
+    "techniques": [
+      {
+        "name": "Beam Search Decoding",
+        "improvement": "CER: 42% \u2192 35-38%",
+        "effort": "Low",
+        "implementation": "\nfrom transformers import Qwen2_5_VLForConditionalGeneration\nfrom peft import PeftModel\n\nmodel = PeftModel.from_pretrained(base_model, 'checkpoint-250')\n\n# Use beam search instead of greedy\noutputs = model.generate(\n    **inputs,\n    num_beams=5,          # 5-beam search\n    early_stopping=True,\n    max_new_tokens=512\n)\n"
+      },
+      {
+        "name": "Ensemble Predictions",
+        "improvement": "CER: 42% \u2192 32-36%",
+        "effort": "Medium",
+        "implementation": "\n# Combine predictions from multiple checkpoints\ncheckpoints = [\n    'checkpoint-100',\n    'checkpoint-150', \n    'checkpoint-200',\n    'checkpoint-250'\n]\n\npredictions = []\nfor ckpt in checkpoints:\n    model = PeftModel.from_pretrained(base_model, ckpt)\n    pred = model.generate(**inputs)\n    predictions.append(pred)\n\n# Voting or averaging\nensemble_result = vote_predictions(predictions)\n"
+      },
+      {
+        "name": "Temperature & Top-P Sampling",
+        "improvement": "CER: 42% \u2192 38-40%",
+        "effort": "Low",
+        "implementation": "\noutputs = model.generate(\n    **inputs,\n    temperature=0.7,      # Lower = more confident\n    top_p=0.9,            # Nucleus sampling\n    top_k=50,             # Top-k sampling\n    max_new_tokens=512\n)\n"
+      }
+    ]
+  },
+  "Phase 2B: Post-Processing": {
+    "description": "Improve predictions after generation",
+    "techniques": [
+      {
+        "name": "Character Correction Dictionary",
+        "improvement": "CER: 42% \u2192 35-40%",
+        "effort": "Medium",
+        "implementation": "\n# Load Odia character correction dictionary\ncorrections = {\n    '\u0b17': ['\u0b18', '\u0b17'],  # Similar chars\n    '\u0b26': ['\u0b27', '\u0b26'],\n    '\u0b1f': ['\u0b20', '\u0b1f'],\n}\n\n# Spell correction using dictionary\nfor original, likely_corrections in corrections.items():\n    if likely_matches(prediction, original):\n        prediction = prediction.replace(original, most_likely_char(likely_corrections))\n"
+      },
+      {
+        "name": "Confidence Scoring",
+        "improvement": "CER: 42% \u2192 38-41%",
+        "effort": "Medium",
+        "implementation": "\n# Generate with return_dict_in_generate=True\noutputs = model.generate(\n    **inputs,\n    return_dict_in_generate=True,\n    output_scores=True,\n)\n\n# Filter low-confidence predictions\nfor token_id, score in zip(outputs.sequences[0], outputs.scores):\n    if score < confidence_threshold:\n        # Use correction or skip\n        pass\n"
+      },
+      {
+        "name": "Language Model Reranking",
+        "improvement": "CER: 42% \u2192 30-35%",
+        "effort": "High",
+        "implementation": "\n# Independent Odia language model\nodia_lm = load_odia_language_model()\n\n# Rerank beam search candidates\ncandidates = model.generate(\n    **inputs,\n    num_beams=10,\n    num_return_sequences=10\n)\n\n# Score with independent LM\nscored = [(odia_lm.score(c), c) for c in candidates]\nbest = max(scored, key=lambda x: x[0])\n"
+      }
+    ]
+  },
+  "Phase 2C: Model Enhancement": {
+    "description": "Improve model without retraining from scratch",
+    "techniques": [
+      {
+        "name": "LoRA Rank Increase",
+        "improvement": "CER: 42% \u2192 38-40%",
+        "effort": "High",
+        "implementation": "\n# Higher-rank LoRA adapter\nlora_config = LoraConfig(\n    r=64,              # Increased from 32\n    lora_alpha=128,    # Increased from 64\n    target_modules=['q_proj', 'v_proj', 'k_proj'],  # More targets\n    lora_dropout=0.05,\n)\n\n# Quick fine-tune on subset\nmodel = get_peft_model(base_model, lora_config)\n# Train on 10% data for 1 hour\n"
+      },
+      {
+        "name": "Adapter Merge Optimization",
+        "improvement": "CER: 42% \u2192 39-42%",
+        "effort": "Low",
+        "implementation": "\n# Merge LoRA weights into base model\nfrom peft import PeftModel\n\nmodel = PeftModel.from_pretrained(base_model, 'checkpoint-250')\n\n# Merge for faster inference\nmerged_model = model.merge_and_unload()\n\n# Save merged\nmerged_model.save_pretrained('checkpoint-250-merged')\n"
+      },
+      {
+        "name": "Multi-Scale Feature Extraction",
+        "improvement": "CER: 42% \u2192 36-39%",
+        "effort": "Very High",
+        "implementation": "\n# Use different image sizes\nimage_sizes = [\n    (224, 224),    # Low res\n    (336, 336),    # Medium res\n    (672, 672),    # High res\n]\n\npredictions = []\nfor size in image_sizes:\n    resized_img = resize_image(image, size)\n    pred = model.generate(**process(resized_img))\n    predictions.append(pred)\n\n# Ensemble predictions\nfinal = ensemble_predictions(predictions)\n"
+      }
+    ]
+  },
+  "Phase 3: Data-Driven Improvements": {
+    "description": "Collect and use additional training data",
+    "techniques": [
+      {
+        "name": "Active Learning Selection",
+        "improvement": "CER: 42% \u2192 30-35%",
+        "effort": "Very High",
+        "implementation": "\n# Find hardest examples from dataset\nhard_examples = []\nfor example in dataset:\n    pred = model.generate(**inputs[example])\n    error = calculate_cer(pred, reference)\n    if error > 0.5:  # High error\n        hard_examples.append(example)\n\n# Fine-tune on hardest examples only\n# Expected: Better error correction\n"
+      },
+      {
+        "name": "Semi-Supervised Learning",
+        "improvement": "CER: 42% \u2192 25-35%",
+        "effort": "Very High",
+        "implementation": "\n# Label unlabeled data with current model\nunlabeled_data = load_unlabeled_data()  # From internet or documents\n\npredictions = []\nfor image in unlabeled_data:\n    pred = model.generate(**inputs[image])\n    if confidence(pred) > threshold:\n        predictions.append((image, pred))\n\n# Fine-tune on pseudo-labeled data\ntrain_on_pseudo_labeled(predictions)\n"
+      }
+    ]
+  }
+}
