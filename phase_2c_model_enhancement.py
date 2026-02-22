@@ -70,7 +70,7 @@ class OdiaImageAugmentor:
             self.augmentation = A.Compose([
                 A.Rotate(limit=5, p=0.3),  # Slight rotation
                 A.GaussNoise(p=0.2),  # Add noise
-                A.GaussBlur(blur_limit=3, p=0.2),  # Blur
+                A.GaussianBlur(blur_limit=3, p=0.2),  # Blur
                 A.RandomBrightnessContrast(p=0.2),  # Brightness/contrast
                 A.Affine(shear=(-2, 2), p=0.2),  # Shear
             ], p=prob)
