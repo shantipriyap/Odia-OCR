@@ -70,7 +70,22 @@ This repository contains a fine-tuned **Qwen/Qwen2.5-VL-3B-Instruct** multimodal
 | **Adapter Size** | 56 MB | ✅ Lightweight LoRA |
 
 **Evaluation Metrics:**
-> ⏳ Evaluation for checkpoint-500 is pending. Will be updated once completed.
+
+> ⚠️ **CRITICAL ISSUE DETECTED:** Model generates Telugu script instead of Odia script. Training may require adjustment.
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| **Character Error Rate (CER)** | 94.98% | ❌ High Error |
+| **Character Accuracy** | 5.02% | ❌ Very Low |
+| **Word Error Rate (WER)** | 101.97% | ❌ Poor Performance |
+| **Exact Match Rate** | 0.00% | ❌ No Matches |
+| **Avg Inference Time** | 23.55 sec/sample | ⚠️ Slow |
+| **Throughput** | 0.042 samples/sec | ⚠️ Low |
+
+**Issue Analysis:**
+- Model outputs **Telugu script (తెలుగు)** instead of **Odia script (ଓଡ଼ିଆ)**
+- Example: Input "କୃଷିପାଠ" → Output "దుస్తీయం" 
+- Likely causes: Dataset contamination, base model bias, or training configuration
 
 ### Training Progress & Status
 
@@ -88,7 +103,7 @@ This repository contains a fine-tuned **Qwen/Qwen2.5-VL-3B-Instruct** multimodal
 | Phase | Approach | Status | Date |
 |-------|----------|--------|------|
 | **Phase 2C** | Full Training (500 steps) | ✅ Complete | Feb 22 |
-| **Evaluation** | Performance metrics | ⏳ Pending | — |
+| **Evaluation** | Performance metrics | ⚠️ Script Mismatch | Feb 22 |
 | **Production** | Optimization & Deployment | 🔄 Future | — |
 
 ### Performance Analysis
@@ -97,7 +112,8 @@ This repository contains a fine-tuned **Qwen/Qwen2.5-VL-3B-Instruct** multimodal
 - ✅ Training completed at 500/500 steps
 - ✅ Final training loss: 5.589 (converged)
 - ✅ Model uploaded to HuggingFace
-- ⏳ Evaluation metrics pending
+- ⚠️ **ISSUE:** Model generates Telugu script instead of Odia
+- 🔄 **Action Required:** Investigate dataset/training configuration
 - 📊 Ready for performance testing
 
 **Key Features:**
