@@ -7,6 +7,8 @@ Test script to verify:
 4. Results match Phase 2A evaluation
 """
 
+import argparse
+from typing import Optional
 import os
 import sys
 import json
@@ -15,7 +17,7 @@ from pathlib import Path
 from PIL import Image
 import time
 
-def test_model_download_and_load():
+def test_model_download_and_load(repo_id: str, device: str, dtype: torch.dtype, offload_dir: Optional[str]):
     """Test downloading model from HuggingFace"""
     print("=" * 70)
     print("🧪 TEST 1: Model Download & Load from HuggingFace")
@@ -23,7 +25,7 @@ def test_model_download_and_load():
     
     try:
         print("\n1️⃣ Importing required libraries...")
-        from transformers import AutoProcessor, LlavaNextForConditionalGeneration
+        from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
         from peft import PeftModel
         print("   ✅ Imports successful")
         
@@ -33,15 +35,24 @@ def test_model_download_and_load():
         processor = AutoProcessor.from_pretrained(model_id)
         print("   ✅ Processor loaded")
         
-        base_model = LlavaNextForConditionalGeneration.from_pretrained(
+        device_map = "auto" if device == "cuda" else "cpu"
+        base_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model_id,
-            torch_dtype=torch.float16,
-            device_map="auto"
+            torch_dtype=dtype,
+            device_map=device_map,
+            low_cpu_mem_usage=True,
+            offload_folder=offload_dir,
+            offload_state_dict=bool(offload_dir),
         )
         print("   ✅ Base model loaded")
         
-        print("\n3️⃣ Loading LoRA adapter from HuggingFace: shantipriya/qwen2.5-odia-ocr...")
-        model = PeftModel.from_pretrained(base_model, "shantipriya/qwen2.5-odia-ocr")
+        print(f"\n3️⃣ Loading LoRA adapter from HuggingFace: {repo_id}...")
+        model = PeftModel.from_pretrained(
+            base_model,
+            repo_id,
+            device_map=device_map,
+            offload_folder=offload_dir,
+        )
         print("   ✅ LoRA adapter loaded successfully")
         
         print("\n✅ TEST 1 PASSED: Model downloaded and loaded successfully!")
@@ -54,7 +65,7 @@ def test_model_download_and_load():
         return None, None
 
 
-def test_inference(model, processor):
+def test_inference(model, processor, device: str, dtype: torch.dtype):
     """Test inference with a sample image"""
     print("\n" + "=" * 70)
     print("🧪 TEST 2: Inference Testing")
@@ -71,7 +82,6 @@ def test_inference(model, processor):
             print("   Creating a simple test image...")
             
             # Create a simple test image
-            from PIL import Image
             img = Image.new('RGB', (100, 100), color='white')
             test_image_path = "test_image.jpg"
             img.save(test_image_path)
@@ -85,13 +95,19 @@ def test_inference(model, processor):
         print(f"   ✅ Image loaded: {image.size}")
         
         print("\n3️⃣ Running inference...")
-        text = "Extract the Odia text from this image. Return only the recognized text."
-        
-        inputs = processor(
-            text=text,
-            images=image,
-            return_tensors="pt"
-        ).to("cuda", torch.float16)
+        prompt = "Extract the Odia text from this image. Return only the recognized text."
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image"},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+        text = processor.apply_chat_template(messages, add_generation_prompt=True)
+        inputs = processor(text=text, images=image, return_tensors="pt").to(device, dtype)
         
         start_time = time.time()
         with torch.no_grad():
@@ -101,7 +117,7 @@ def test_inference(model, processor):
         result = processor.decode(output[0], skip_special_tokens=True)
         
         print(f"   ✅ Inference completed in {inference_time:.2f} seconds")
-        print(f"\n   📝 Input prompt: {text}")
+        print(f"\n   📝 Input prompt: {prompt}")
         print(f"   📝 Model output: {result}")
         
         print("\n✅ TEST 2 PASSED: Inference works successfully!")
@@ -195,15 +211,38 @@ def main():
     print("║" + " " * 68 + "║")
     print("╚" + "=" * 68 + "╝")
     
+    parser = argparse.ArgumentParser(description="Verify HF model download and inference")
+    parser.add_argument(
+        "--repo",
+        default=os.getenv("HF_REPO", "shantipriya/qwen2.5-odia-ocr"),
+        help="HF model repo id (default: env HF_REPO or shantipriya/qwen2.5-odia-ocr)",
+    )
+    parser.add_argument(
+        "--device",
+        choices=["cuda", "cpu"],
+        default="cuda" if torch.cuda.is_available() else "cpu",
+        help="Device to run on (default: auto-detect)",
+    )
+    parser.add_argument(
+        "--offload-dir",
+        default=".offload",
+        help="Offload folder for large models on CPU (default: .offload)",
+    )
+    args = parser.parse_args()
+
+    device = args.device
+    dtype = torch.float16 if device == "cuda" else torch.float32
+    offload_dir = args.offload_dir if device == "cpu" else None
+
     results = {}
     
     # Test 1: Download and load
-    model, processor = test_model_download_and_load()
+    model, processor = test_model_download_and_load(args.repo, device, dtype, offload_dir)
     results['test1_download'] = model is not None
     
     # Test 2: Inference
     if model is not None:
-        inference_ok, inf_time = test_inference(model, processor)
+        inference_ok, inf_time = test_inference(model, processor, device, dtype)
         results['test2_inference'] = inference_ok
         results['inference_time'] = inf_time
     else:
