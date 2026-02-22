@@ -200,11 +200,8 @@ class Phase2CTrainer:
                 max_grad_norm=self.config.max_grad_norm,
                 warmup_steps=self.config.warmup_steps,
                 save_steps=self.config.save_steps,
-                eval_steps=self.config.eval_steps,
                 logging_steps=10,
                 save_total_limit=3,
-                load_best_model_at_end=True,
-                metric_for_best_model="eval_loss",
                 remove_unused_columns=True,
             )
             
