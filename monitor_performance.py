@@ -77,7 +77,10 @@ def upload_checkpoint_to_hf(checkpoint_num):
     """Push checkpoint to HuggingFace Hub"""
     log_message(f"📤 Uploading checkpoint-{checkpoint_num} to HuggingFace...")
     
-    hf_token = os.getenv("HF_TOKEN", "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")
+    hf_token = os.getenv("HF_TOKEN")
+    if not hf_token:
+        log_message("❌ HF_TOKEN environment variable not set")
+        return
     
     # Create tar archive of checkpoint
     tar_cmd = f"cd /root/odia_ocr && tar -czf checkpoint-{checkpoint_num}.tar.gz qwen_odia_ocr_improved_v2/checkpoint-{checkpoint_num}/"

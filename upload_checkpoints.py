@@ -14,7 +14,7 @@ REMOTE_HOST = "135.181.8.206"
 REMOTE_CKPT_DIR = "/root/odia_ocr/qwen_odia_ocr_improved_v2"
 LOCAL_OUTPUT_DIR = "./qwen_odia_ocr_improved_v2"
 HF_REPO = "shantipriya/qwen2.5-odia-ocr-v2"
-HF_TOKEN = os.environ.get("HF_TOKEN", "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")
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 print("""
 ╔════════════════════════════════════════════════════════════════╗

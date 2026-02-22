@@ -15,7 +15,7 @@ metrics:
 
 This repository contains a fine-tuned **Qwen/Qwen2.5-VL-3B-Instruct** multimodal vision-language model specifically adapted for **Odia script OCR** (Optical Character Recognition). The model has been optimized using **LoRA (Low-Rank Adaptation)** via the PEFT library for efficient fine-tuning.
 
-**Model Repository:** https://huggingface.co/shantipriya/qwen2.5-odia-ocr
+**Model Repository:** https://huggingface.co/shantipriya/qwen2.5-odia-ocr-v2
 
 ---
 
@@ -54,6 +54,18 @@ This repository contains a fine-tuned **Qwen/Qwen2.5-VL-3B-Instruct** multimodal
 
 ## Performance Metrics
 
+**Phase 2C Training Status:** Training complete at 500/500 steps (checkpoint-500). Evaluation for this checkpoint is pending.
+
+### Latest Training Summary (checkpoint-500, full run)
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| **Training Steps** | 500 / 500 (100%) | ✅ Complete |
+| **Final Training Loss** | 5.589 | ✅ Logged |
+| **Train Runtime** | 2042 sec (34:01) | ✅ Logged |
+| **Step Time** | 4.08 sec/it (0.245 steps/sec) | ✅ Logged |
+| **GPU Used** | RTX A6000 (79GB VRAM) | ✅ Logged |
+
 ### Latest Evaluation Results (checkpoint-250, 50 test samples)
 
 | Metric | Value | Status |
@@ -70,12 +82,12 @@ This repository contains a fine-tuned **Qwen/Qwen2.5-VL-3B-Instruct** multimodal
 
 | Item | Details |
 |------|---------|
-| **Training Steps Completed** | 250 / 500 (50%) |
-| **Training Status** | ✅ Phase 1 Complete |
-| **Model Uploaded** | ✅ HuggingFace Hub Live |
+| **Training Steps Completed** | 500 / 500 (100%) |
+| **Training Status** | ✅ Phase 2C Complete |
+| **Model Uploaded** | ⏳ Pending (checkpoint-500 upload) |
 | **Dataset Size** | 145,781 Odia text-image pairs |
 | **GPU Used** | RTX A6000 (79GB VRAM) |
-| **Training Speed** | 1.86 iterations/second |
+| **Training Speed** | 4.08 sec/it (0.245 steps/sec) |
 
 ### Performance Trajectory & Achievements
 
@@ -84,17 +96,17 @@ This repository contains a fine-tuned **Qwen/Qwen2.5-VL-3B-Instruct** multimodal
 | **Phase 1** | Training 250/500 steps | 42.0% ✅ | ✅ Complete | Feb 22 |
 | **Phase 2A** | Beam Search + Ensemble | 32.0% ✅ | ✅ COMPLETE | Feb 22 |
 | **Phase 2B** | +Post-processing | 24-28% 📈 | 🔄 Optional | — |
-| **Phase 2C** | +Model Enhancement | 18-22% 🎯 | 🔄 Optional | — |
+| **Phase 2C** | +Model Enhancement | TBD (eval pending) | ✅ Training Complete | Feb 22 |
 | **Production** | Full + Optimization | < 15% 🎯 | 🔄 Future | — |
 
 ### Performance Analysis
 
-**Current Status (Phase 1 - 50% Training):**
-- ✅ Model successfully training and improving
-- ✅ Character Error Rate: 42% (acceptable for partial training)
-- ✅ Clear learning trajectory across checkpoints
-- ↔️ Model showing progressive improvement from checkpoint-50 to checkpoint-250
-- ⚠️ Not yet production-ready (requires Phase 2)
+**Current Status (Phase 2C - 100% Training, eval pending):**
+- ✅ Training run completed (checkpoint-500)
+- ✅ Final training loss logged at 5.589
+- ⏳ Evaluation for checkpoint-500 pending
+- ↔️ Prior evaluation metrics below refer to checkpoint-250
+- ⚠️ Production readiness depends on evaluation results
 
 **Key Findings:**
 1. **Model is Learning**: CER decreased as training progressed (checkpoint trajectory)
@@ -322,13 +334,13 @@ Production: Final optimization → CER: <15% (target)
 ### Phase 2: Complete Training (500 steps)
 
 **Target:** ~20% CER  
-**Time Required:** 2.5 additional hours  
-**Expected Improvement:** 20-22% CER reduction  
+**Status:** ✅ Completed (evaluation pending)  
+**Actual Runtime:** 34 minutes  
 
 ```
 Current:     42% CER ========→ Phase 2:  20% CER ========→ Production: 10% CER
 Phase 1 Complete         Full Training          Quantization & Optimization
-   ✅                        📋                        🔄
+   ✅                        ✅                        🔄
 ```
 
 ### Achieving Production Accuracy
