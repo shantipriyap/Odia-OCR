@@ -1,3 +1,14 @@
+---
+license: apache-2.0
+datasets:
+   - shantipriya/odia-ocr-merged
+language:
+   - or
+metrics:
+   - character_error_rate
+   - word_error_rate
+---
+
 # Odia OCR - Fine-tuned Qwen2.5-VL for Optical Character Recognition
 
 ## Overview
