@@ -25,6 +25,22 @@ A production-ready vision-language model fine-tuned on **58,720 validated Odia t
 - **Dataset:** [shantipriya/odia-ocr-merged](https://huggingface.co/datasets/shantipriya/odia-ocr-merged)
 - **Model:** [https://huggingface.co/shantipriya/odia-ocr-qwen-finetuned](https://huggingface.co/shantipriya/odia-ocr-qwen-finetuned)
 - **Author:** [Shantipriya Parida](https://github.com/shantipriya)
+- **GitHub:** [shantipriyap/odia-ocr-qwen-finetuned](https://github.com/shantipriyap/odia-ocr-qwen-finetuned)
+
+---
+
+## Table of Contents
+
+- [📈 Performance Metrics](#performance-metrics)
+- [📊 Dataset](#dataset-information)
+- [⚡ Installation](#installation)
+- [🚀 Getting Started](#getting-started)
+- [💡 Quick Start](#quick-start)
+- [📚 Examples](#examples)
+- [🛠️ Model Details](#model-details)
+- [📋 Evaluation](#validation-results)
+- [⚠️ Limitations](#limitations)
+- [🔮 Future Work](#future-improvements)
 
 ---
 
@@ -84,16 +100,88 @@ A production-ready vision-language model fine-tuned on **58,720 validated Odia t
 ## Installation
 
 ### Requirements
-- Python 3.8+
-- PyTorch 2.0+
-- Transformers 4.36+
-- PIL (pillow)
+- **Python:** 3.8+
+- **GPU:** 12GB+ VRAM (recommended: A100 with 80GB)
+- **Disk:** ~50GB (for model + data)
+- **OS:** Linux, macOS, or Windows
 
-### Setup
+### Quick Setup (Automated)
 
 ```bash
-pip install transformers torch torchvision pillow
+# Clone and setup
+git clone https://github.com/shantipriyap/odia-ocr-qwen-finetuned
+cd odia-ocr-qwen-finetuned
+bash setup.sh
 ```
+
+The `setup.sh` script will:
+1. Create a Python virtual environment
+2. Install all dependencies from `requirements.txt`
+3. Show available commands
+
+### Manual Setup
+
+```bash
+# 1. Create virtual environment
+python3 -m venv venv
+
+# 2. Activate virtual environment
+source venv/bin/activate  # Linux/macOS
+# or
+venv\Scripts\activate     # Windows
+
+# 3. Install dependencies
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+```
+
+### Verify Installation
+
+```bash
+python -c "import torch; print('✅ PyTorch:', torch.__version__); print('✅ CUDA:', torch.cuda.is_available())"
+```
+
+---
+
+## Getting Started
+
+### 🎯 Quick Inference (Single Image)
+
+```bash
+# Extract Odia text from an image
+python inference.py --image document.jpg
+```
+
+### 📊 Evaluate Model
+
+```bash
+# Run evaluation on test set
+python eval.py
+
+# Evaluate first 100 samples
+python eval.py --max-samples 100
+```
+
+### 🔄 Train Your Own Model
+
+```bash
+# Fine-tune on Odia OCR dataset (requires A100 GPU)
+python train.py
+```
+
+**Note:** Training requires:
+- NVIDIA A100 GPU (80GB VRAM)
+- ~4 hours training time
+- 58,720 Odia text-image samples
+
+### 📚 More Detailed Instructions
+
+See [**QUICKSTART.md**](QUICKSTART.md) for:
+- Step-by-step setup guide
+- Training configuration
+- Batch inference
+- Troubleshooting
+- Docker usage
 
 ---
 
