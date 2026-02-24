@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """
-🚀 ODIA OCR SPACE - PRODUCTION VERSION
-Robust Streamlit app for Odia text recognition using Qwen2.5-VL
+🚀 ODIA OCR SPACE - GRADIO VERSION
+Robust Gradio app for Odia text recognition using Qwen2.5-VL
+Following Qaari-Urdu-OCR pattern with GPU optimization
 """
 
-import streamlit as st
+import gradio as gr
+import time
+import spaces
+from PIL import Image
+from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+from qwen_vl_utils import process_vision_info
+import torch
+import uuid
 import os
-import sys
+import numpy as np
 import warnings
-from contextlib import suppress
 
 warnings.filterwarnings('ignore')
 
@@ -16,262 +23,246 @@ warnings.filterwarnings('ignore')
 os.environ['HF_HUB_DISABLE_IMPLICIT_TOKEN'] = '1'
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-# Detect environment
-IS_SPACES = os.environ.get('SPACES', False)
-if IS_SPACES:
-    os.environ['HF_HUB_DISABLE_IMPLICIT_TOKEN'] = '1'
-
-# ============ PAGE CONFIG ============
-st.set_page_config(
-    page_title="Odia OCR - Qwen2.5-VL",
-    page_icon="📖",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
-# Hide streamlit UI elements in Spaces
-if IS_SPACES:
-    st.set_option('client.showErrorDetails', False)
-
-# ============ TITLE & INFO ============
-st.markdown("""
-# 📖 OdiaLipi - Odia Text Recognition
-
-**Advanced OCR with Qwen2.5-VL** 🚀
-
-Fine-tuned on 145K+ Odia OCR samples
-""")
-
-st.info("""
-✨ **Features:**
-- 📊 **58% accuracy** on Odia OCR
-- ⚡ **2.3 seconds** per image  
-- 🎯 Qwen2.5-VL Vision-Language AI
-- 🔒 Privacy-first processing
-""")
-
-st.divider()
-
-# ============ MODEL LOADING WITH RETRY ============
-@st.cache_resource(show_spinner=False)
-def load_model():
-    """Load Qwen OCR model with retry logic"""
-    
-    import torch
-    
-    # Detect device
+# Detect device for optimal dtype
+def get_device_config():
+    """Detect device and set appropriate dtype"""
     if torch.cuda.is_available():
-        device = "cuda"
-        dtype = torch.float16
+        return "cuda", torch.float16
     elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        device = "mps"
-        dtype = torch.float32
+        return "mps", torch.float32
     else:
-        device = "cpu"
-        dtype = torch.float32
+        return "cpu", torch.float32
+
+device, dtype = get_device_config()
+
+# ============ MODEL LOADING ============
+print("=" * 70)
+print("🚀 ODIA OCR SPACE - LOADING MODEL")
+print("=" * 70)
+
+try:
+    # Try loading fine-tuned model
+    print("📥 Loading fine-tuned model...")
+    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        "OdiaGenAIOCR/odia-ocr-qwen-finetuned",
+        torch_dtype=dtype,
+        device_map=device,
+        trust_remote_code=True
+    )
+    processor = AutoProcessor.from_pretrained(
+        "OdiaGenAIOCR/odia-ocr-qwen-finetuned",
+        trust_remote_code=True
+    )
+    print("✅ Fine-tuned model loaded successfully")
+    model_info = "Fine-tuned on 145K+ Odia OCR samples"
+    
+except Exception as e1:
+    print(f"⚠️  Fine-tuned model loading failed: {str(e1)[:80]}")
+    print("📥 Loading base model as fallback...")
     
     try:
-        from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+            "Qwen/Qwen2.5-VL-3B-Instruct",
+            torch_dtype=dtype,
+            device_map=device,
+            trust_remote_code=True
+        )
+        processor = AutoProcessor.from_pretrained(
+            "Qwen/Qwen2.5-VL-3B-Instruct",
+            trust_remote_code=True
+        )
+        print("✅ Base model loaded as fallback")
+        model_info = "Base Qwen2.5-VL model"
         
-        with st.spinner("⏳ Loading model (1-2 min on first run)..."):
-            # Try loading our fine-tuned model
-            try:
-                processor = AutoProcessor.from_pretrained(
-                    "Qwen/Qwen2.5-VL-3B-Instruct",
-                    trust_remote_code=True,
-                )
-                
-                model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                    "OdiaGenAIOCR/odia-ocr-qwen-finetuned",
-                    torch_dtype=dtype,
-                    device_map=device,
-                    trust_remote_code=True,
-                )
-                
-                model.eval()
-                return processor, model, device
-                
-            except Exception as e1:
-                st.warning(f"⚠️ Could not load fine-tuned model: {str(e1)[:80]}")
-                
-                # Fallback: Load base model
-                st.info("Loading base Qwen model instead...")
-                processor = AutoProcessor.from_pretrained(
-                    "Qwen/Qwen2.5-VL-3B-Instruct",
-                    trust_remote_code=True,
-                )
-                
-                model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                    "Qwen/Qwen2.5-VL-3B-Instruct",
-                    torch_dtype=dtype,
-                    device_map=device,
-                    trust_remote_code=True,
-                )
-                
-                model.eval()
-                return processor, model, device
-            
-    except Exception as e:
-        st.error(f"❌ Failed to load model: {str(e)[:150]}")
-        return None, None, None
+    except Exception as e2:
+        print(f"❌ Failed to load any model: {e2}")
+        raise RuntimeError("Could not load vision-language model")
 
-# ============ TEXT EXTRACTION ============
-def extract_text(image, processor, model, device):
-    """Extract Odia text from image"""
+model.eval()
+max_tokens = 2000
+
+print("=" * 70)
+print(f"✅ Device: {device.upper()} | Dtype: {dtype}")
+print(f"✅ Model: {model_info}")
+print("=" * 70)
+
+# ============ OCR PROCESSING ============
+@spaces.GPU
+def perform_ocr(image):
+    """Process image and extract Odia text using OCR model"""
+    
     try:
-        import torch
-        from PIL import Image
+        # Validate input
+        if image is None:
+            return "❌ Error: No image provided"
         
-        # Ensure RGB
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
+        inputArray = np.any(image)
+        if inputArray == False:
+            return "❌ Error: Image is empty or invalid"
         
-        # Resize if too large
-        max_size = 1024
-        if max(image.size) > max_size:
-            image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+        # Convert to PIL Image
+        image_pil = Image.fromarray(image.astype('uint8')).convert('RGB')
         
-        # Prepare prompt
-        prompt = "Read all text in this image. Return ONLY the text you can see."
+        # Save with UUID for processing
+        temp_file = str(uuid.uuid4()) + ".png"
+        image_pil.save(temp_file)
         
-        # Process
+        # OCR Prompt in Odia context
+        prompt = """Below is an image of an Odia document or text. 
+Please extract and return ONLY the plain text representation of the Odia content you see.
+Do not add any explanations or hallucinations.
+Return the text exactly as it appears in the document."""
+        
+        # Prepare messages for Qwen
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": f"file://{temp_file}"},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ]
+        
+        # Process inputs
+        text = processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        image_inputs, video_inputs = process_vision_info(messages)
         inputs = processor(
-            images=image,
-            text=prompt,
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
             return_tensors="pt",
-        ).to(device)
+        )
+        inputs = inputs.to(device)
         
-        # Generate
+        # Generate text
         with torch.no_grad():
             generated_ids = model.generate(
                 **inputs,
-                max_new_tokens=256,
-                temperature=0.7,
-                do_sample=True,
+                max_new_tokens=max_tokens,
+                use_cache=True
             )
         
-        # Decode
-        text = processor.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+        generated_ids_trimmed = [
+            out_ids[len(in_ids):] 
+            for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+        ]
         
-        # Post-process
-        if "image" in text.lower():
-            text = text.split("image")[-1].strip()
+        output_text = processor.batch_decode(
+            generated_ids_trimmed,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=False
+        )[0]
         
-        return text.strip() if text.strip() else "⚠️ No text detected in image"
+        # Cleanup
+        try:
+            os.remove(temp_file)
+        except:
+            pass
+        
+        return output_text if output_text else "⚠️ No text extracted from image"
         
     except Exception as e:
-        return f"❌ Error: {str(e)[:100]}"
+        error_msg = str(e)[:100]
+        print(f"❌ OCR Error: {error_msg}")
+        return f"❌ Error during processing: {error_msg}"
 
-# ============ MAIN UI ============
-st.subheader("📸 Upload Image")
-
-uploaded_file = st.file_uploader(
-    "Choose an image with Odia or English text",
-    type=["jpg", "jpeg", "png", "gif", "webp", "bmp"],
-    help="Maximum recommended size: 10MB"
-)
-
-if uploaded_file:
-    from PIL import Image
-    import time
+# ============ GRADIO INTERFACE ============
+with gr.Blocks(title="OdiaLipi - Odia OCR with Qwen2.5-VL", theme=gr.themes.Soft()) as demo:
     
-    st.divider()
+    # Header
+    gr.Markdown(
+        """
+        # 📖 OdiaLipi - Odia Text Recognition
+        **Advanced OCR with Qwen2.5-VL Vision-Language AI**
+        
+        Upload an image of Odia text to extract the content in real-time.
+        """
+    )
     
-    # Load image
-    try:
-        image = Image.open(uploaded_file)
-    except Exception as e:
-        st.error(f"Failed to load image: {e}")
-        image = None
-    
-    if image:
-        # Display info
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Input Image:**")
-            st.image(image, use_column_width=True)
-        
-        with col2:
-            st.markdown("**Image Info:**")
-            st.metric("Size", f"{image.width} × {image.height} px")
-            st.metric("Format", image.format or "Unknown")
-            st.metric("File Size", f"{len(uploaded_file.getvalue()) / 1024:.1f} KB")
-        
-        st.divider()
-        
-        # Extract button
-        if st.button("🚀 Extract Text", use_container_width=True, type="primary"):
+    with gr.Row():
+        with gr.Column(scale=1):
+            # Input section
+            gr.Markdown("### 📸 Upload Image")
+            image_input = gr.Image(
+                type="numpy",
+                label="Odia Document Image",
+                sources=["upload", "webcam"]
+            )
             
-            # Load model
-            processor, model, device = load_model()
+            # Models & formats info
+            with gr.Accordion("📋 Supported Formats & Features", open=False):
+                gr.Markdown("""
+                **Image Formats:** JPG, PNG, GIF, WebP, BMP
+                
+                **Model:** Qwen2.5-VL-3B
+                - 3 Billion parameters
+                - Vision-Language capability
+                - Context: up to 2000 output tokens
+                - Device: GPU/MPS/CPU (auto-detected)
+                
+                **Fine-tuning:**
+                - Dataset: 145K+ Odia OCR samples
+                - Accuracy: ~58% on Odia text
+                - Speed: ~2.3 seconds per image
+                """)
             
-            if processor and model and device:
-                try:
-                    start_time = time.time()
-                    
-                    with st.spinner("🔄 Extracting text..."):
-                        text = extract_text(image, processor, model, device)
-                    
-                    elapsed = time.time() - start_time
-                    
-                    # Results
-                    st.markdown("### ✅ Extraction Results")
-                    
-                    st.text_area(
-                        "Extracted Text",
-                        value=text,
-                        height=150,
-                        disabled=True,
-                    )
-                    
-                    # Metrics
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("⏱️ Processing Time", f"{elapsed:.2f}s")
-                    col2.metric("📝 Characters", len(text))
-                    col3.metric("📊 Words", len(text.split()))
-                    
-                except Exception as e:
-                    st.error(f"❌ Extraction failed: {str(e)[:200]}")
-            else:
-                st.error("❌ Could not initialize model. Please refresh the page.")
-
-else:
-    st.markdown("""
-    ### 📖 How to Use:
-    1. **Upload** an image containing Odia or English text
-    2. **Review** the preview
-    3. **Click** "Extract Text"
-    4. **Copy** your results
+            # Submit button
+            submit_btn = gr.Button("🚀 Extract Text", variant="primary", size="lg")
+        
+        with gr.Column(scale=1):
+            # Output section
+            gr.Markdown("### 📝 Extracted Text")
+            output = gr.Textbox(
+                label="Odia Text",
+                lines=20,
+                show_copy_button=True,
+                interactive=False
+            )
+            
+            # Model information
+            with gr.Accordion("ℹ️ Model Details", open=False):
+                gr.Markdown(f"""
+                **Model:** Qwen2.5-VL-3B
+                **Status:** {model_info}
+                **Device:** {device.upper()}
+                **Precision:** {str(dtype).split('.')[-1]}
+                
+                **Capabilities:**
+                - Extract Odia text from documents
+                - Handwritten and printed text
+                - Multi-line document processing
+                - Real-time inference
+                
+                **Performance:**
+                - First load: 2-3 minutes (model download)
+                - Subsequent: <2 seconds (cached)
+                """)
     
-    ### ✨ Supported Formats:
-    JPG, PNG, GIF, WebP, BMP (up to 200MB)
+    # Establish processing flow
+    submit_btn.click(
+        fn=perform_ocr,
+        inputs=image_input,
+        outputs=output
+    )
+    image_input.change(
+        fn=perform_ocr,
+        inputs=image_input,
+        outputs=output
+    )
     
-    ### 🎯 Model Information:
-    - **Base Model:** Qwen/Qwen2.5-VL-3B-Instruct
-    - **Fine-tuned on:** 145,000+ Odia OCR samples
-    - **Training Method:** LoRA fine-tuning
-    - **Benchmark Accuracy:** 58% on Odia text
-    - **First Run:** ~2 minutes to download model
-    
-    ### ⚡ Performance:
-    - **Speed:** 2-3 seconds per image
-    - **GPU:** Automatic (CUDA/MPS/CPU)
-    - **Memory:** ~8GB for model
-    """)
+    # Footer
+    gr.Markdown(
+        """
+        ---
+        **OdiaLipi** • Powered by Qwen2.5-VL • 
+        [Model Card](https://huggingface.co/OdiaGenAIOCR/odia-ocr-qwen-finetuned) • 
+        [Dataset](https://huggingface.co/datasets/OdiaGenAIOCR/odia-ocr-merged)
+        """
+    )
 
-st.divider()
-
-# Footer
-st.markdown("""
-<div style='text-align: center; color: #888; font-size: 0.85em; margin-top: 40px;'>
-
-**OdiaLipi** - Advanced Odia Text Recognition  
-Powered by Qwen2.5-VL + LoRA Fine-tuning
-
-[🔗 Model](https://huggingface.co/OdiaGenAIOCR/odia-ocr-qwen-finetuned) | 
-[📚 Dataset](https://huggingface.co/datasets/shantipriya/odia-ocr-merged) |
-[💝 Support](https://huggingface.co/OdiaGenAIOCR)
-
-</div>
-""", unsafe_allow_html=True)
+if __name__ == "__main__":
+    demo.launch()
